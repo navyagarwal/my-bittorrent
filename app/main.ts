@@ -1,6 +1,3 @@
-// Examples:
-// - decodeBencode("5:hello") -> "hello"
-// - decodeBencode("10:hello12345") -> "hello12345"
 function decodeBencode(bencodedValue: string): string | number | Array<any> {
     if (!isNaN(parseInt(bencodedValue[0]))) {
         return decodeBencodeString(bencodedValue);
@@ -14,14 +11,13 @@ function decodeBencode(bencodedValue: string): string | number | Array<any> {
 }
 
 function decodeBencodeString(bencodedValue: string): string {
-    /* This function is used to decode a bencoded string
-    The bencoded string is a string that is prefixed by the length of the string
-    **/
     const firstColonIndex = bencodedValue.indexOf(":");
     if (firstColonIndex === -1) {
         throw new Error("Invalid encoded value");
     }
-    return bencodedValue.substring(firstColonIndex + 1);
+    const lenStr = bencodedValue.substring(0, firstColonIndex);
+    const len = parseInt(lenStr);
+    return bencodedValue.substring(firstColonIndex + 1, len);
 }
 
 function decodeBencodeNumber(bencodedValue: string): number {
@@ -35,10 +31,11 @@ function decodeBencodeList(bencodedValue: string): Array<any> {
     let listStr = bencodedValue.substring(1, bencodedValue.length - 2);
     while(listStr.length > 0){
         if(!isNaN(parseInt(listStr[0]))){
-            ans.push(decodeBencodeString(listStr.substring(0, parseInt(listStr[0])+2)));
-            listStr = listStr.substring(parseInt(listStr[0])+3);
+            const lenStr = bencodedValue.substring(0, listStr.indexOf(":"));
+            ans.push(decodeBencodeString(listStr));
+            listStr = listStr.substring(parseInt(lenStr)+lenStr.length+1);
         } else {
-            const first_e_index = bencodedValue.indexOf("e");
+            const first_e_index = listStr.indexOf("e");
             if(listStr[0] == 'i'){
                 ans.push(decodeBencodeNumber(listStr.substring(0, first_e_index+1)));
             } else {
@@ -48,6 +45,19 @@ function decodeBencodeList(bencodedValue: string): Array<any> {
         }
     }
     return ans;
+}
+
+function decodeBencodeDictionary(bencodedValue: string): Map<any, any> {
+    let dictionary = new Map<any, any>;
+    const list = decodeBencodeList(bencodedValue);
+    if(list.length%2 == 0){
+        let i = 0;
+        while(i < list.length){
+            dictionary.set(list[i], list[i+1]);
+            i += 2;
+        }
+    }
+    return dictionary;
 }
 
 const args = process.argv;
