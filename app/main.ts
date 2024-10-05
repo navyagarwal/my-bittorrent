@@ -1,3 +1,5 @@
+import fs from "fs";
+
 function decodeBencode(bencodedValue: string): [string | number | Array<any> | Map<any, any>, number] {
     if (!isNaN(parseInt(bencodedValue[0]))) {
         return decodeBencodeString(bencodedValue);
@@ -53,9 +55,9 @@ function decodeBencodeDictionary(bencodedValue: string): [Map<any, any>, number]
 }
 
 const args = process.argv;
-const bencodedValue = args[3];
 
 if (args[2] === "decode") {
+    const bencodedValue = args[3];
     try {
         const [decoded, _] = decodeBencode(bencodedValue);
         console.log(JSON.stringify(decoded));
@@ -63,5 +65,16 @@ if (args[2] === "decode") {
         if(error instanceof Error){
             console.error(error.message);
         }
+    }
+} else if (args[2] === "info") {
+    const torrentFile = args[3];
+    const contents = fs.readFileSync(torrentFile, "utf-8");
+    const [decoded, decodedLength] = decodeBencode(contents);
+    if(decoded instanceof Map){
+        const torrent = decoded;
+        if(!torrent.has("announce") || !torrent.has("info")){
+            throw new Error("Invalid Torrent File");
+        }
+        console.log(`Tracker URL: ${torrent.get("announce")}\nLength: ${torrent.get("info").get("length")}`);
     }
 }
