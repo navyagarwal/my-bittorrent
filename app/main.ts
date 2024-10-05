@@ -57,7 +57,7 @@ const bencodedValue = args[3];
 
 if (args[2] === "decode") {
     try {
-        const decoded = decodeBencode(bencodedValue);
+        const [decoded, _] = decodeBencode(bencodedValue);
         console.log(JSON.stringify(decoded));
     } catch (error) {
         if(error instanceof Error){
