@@ -36,6 +36,7 @@ function encodeList(list: Array<any>): string {
     list.forEach((item) => {
         bencodedStr += bencode(item);
     })
+    bencodedStr += "e";
     return bencodedStr;
 }
 
