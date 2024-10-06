@@ -1,6 +1,8 @@
 import { readFileSync } from "fs";
 import { bencode, isRecord } from "./encoders";
 import { createHash } from "crypto";
+import axios from "axios";
+import { errorMonitor } from "events";
 
 function decodeBencode(bencodedValue: string): [string | number | Array<any> | Record<string, any>, number] {
     if (!isNaN(parseInt(bencodedValue[0]))) {
@@ -68,6 +70,46 @@ function generateInfoHash(infoMap: Record<string, any>): string {
     return infoHash;
 }
 
+function decodeTorrentFile (torrentFile: string): Record<string, any> {
+    const contents = readFileSync(torrentFile).toString("binary");
+    const [decoded, decodedLength] = decodeBencode(contents);
+    if(isRecord(decoded) && "announce" in decoded && "info" in decoded){
+        return decoded;
+    } else {
+        throw new Error("Invalid Torrent File");
+    }
+}
+
+function getPieceHashes(inputStr: string): string {
+    const pieceHashesBuffer = Buffer.from(inputStr, "binary");
+    let formattedPieceHashes = "";
+    for (let i = 0; i < pieceHashesBuffer.length; i += 20) {
+        const pieceHash = pieceHashesBuffer.subarray(i, i + 20).toString("hex");
+        formattedPieceHashes += pieceHash + "\n";
+    }
+    return formattedPieceHashes;
+}
+
+async function getPeers(info_hash: string, peer_id: string = "1235678", port: string = "6881", uploaded: number = 0, downloaded: number = 0, left: number = 0, compact: number = 1): Promise<string> {
+    try{
+        const response = await axios.get('https://api.example.com/data', {
+            params: {
+                info_hash,
+                peer_id,
+                port,
+                uploaded,
+                downloaded,
+                left,
+                compact
+            }
+        }); 
+        return response.data;
+    } catch(error) {
+        console.error(error);
+        throw error;
+    }
+}
+
 const args = process.argv;
 
 if (args[2] === "decode") {
@@ -82,19 +124,24 @@ if (args[2] === "decode") {
     }
 } else if (args[2] === "info") {
     const torrentFile = args[3];
-    const contents = readFileSync(torrentFile).toString("binary");
-    const [decoded, decodedLength] = decodeBencode(contents);
-    if(isRecord(decoded)){
-        const torrent = decoded;
-        if(!("announce" in torrent) || !("info" in torrent)){
-            throw new Error("Invalid Torrent File");
+    const torrent = decodeTorrentFile(torrentFile);
+    const formattedPieceHashes = getPieceHashes(torrent["info"]["pieces"]);
+    console.log(`Tracker URL: ${torrent["announce"]}\nLength: ${torrent["info"]["length"]}\nInfo Hash: ${generateInfoHash(torrent["info"])}\nPiece Length: ${torrent["info"]["piece length"]}\nPiece Hashes: \n${formattedPieceHashes}`);
+} else if (args[3] === "peers") {
+    const torrentFile = args[3];
+    const torrent = decodeTorrentFile(torrentFile);
+    const infoHash = generateInfoHash(torrent["info"]);
+    const peersResponse = await getPeers(infoHash);
+    const peers = decodeBencode(peersResponse);
+    if(isRecord(peers) && "peers" in peers){
+        const peerList = peers.peers;
+        if(peerList instanceof Array){
+            peerList.forEach((element) => {
+                console.log(element);
+            })
+        }} else {
+            throw new Error("Not valid array of Peer IPs!");
         }
-        const pieceHashesBuffer = Buffer.from(torrent["info"]["pieces"], "binary");
-        let formattedPieceHashes = "";
-        for (let i = 0; i < pieceHashesBuffer.length; i += 20) {
-            const pieceHash = pieceHashesBuffer.subarray(i, i + 20).toString("hex");
-            formattedPieceHashes += pieceHash + "\n";
-        }
-        console.log(`Tracker URL: ${torrent["announce"]}\nLength: ${torrent["info"]["length"]}\nInfo Hash: ${generateInfoHash(torrent["info"])}\nPiece Length: ${torrent["info"]["piece length"]}\nPiece Hashes: \n${formattedPieceHashes}`);
-    }
+    } else {
+        console.error("Peers is not a valid dictionary!");
 }
