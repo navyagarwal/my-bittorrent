@@ -89,16 +89,12 @@ if (args[2] === "decode") {
         if(!("announce" in torrent) || !("info" in torrent)){
             throw new Error("Invalid Torrent File");
         }
-        const pieceHashes = torrent["info"]["pieces"];
+        const pieceHashesBuffer = Buffer.from(torrent["info"]["pieces"], "binary");
         let formattedPieceHashes = "";
-        for (let i = 0; i < pieceHashes.length; i += 40) {
-            formattedPieceHashes += pieceHashes.slice(i, i + 40) + "\n";
+        for (let i = 0; i < pieceHashesBuffer.length; i += 20) {
+            const pieceHash = pieceHashesBuffer.subarray(i, i + 20).toString("hex");
+            formattedPieceHashes += pieceHash + "\n";
         }
-        console.log(`   Tracker URL: ${torrent["announce"]}\n
-                        Length: ${torrent["info"]["length"]}\n
-                        Info Hash: ${generateInfoHash(torrent["info"])}\n
-                        Piece Length: ${torrent["info"]["piece length"]}\n
-                        Piece Hashes: \n${formattedPieceHashes}\n
-                    `);
+        console.log(`Tracker URL: ${torrent["announce"]}\nLength: ${torrent["info"]["length"]}\nInfo Hash: ${generateInfoHash(torrent["info"])}\nPiece Length: ${torrent["info"]["piece length"]}\nPiece Hashes: \n${formattedPieceHashes}`);
     }
 }
