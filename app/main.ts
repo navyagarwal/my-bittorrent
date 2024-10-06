@@ -64,7 +64,8 @@ function decodeBencodeDictionary(bencodedValue: string): [Record<string, any>, n
 function generateInfoHash(infoMap: Record<string, any>): string {
     const bencodedStr = bencode(infoMap);
     console.log(bencodedStr);
-    const infoHash = createHash("sha1").update(bencodedStr).digest("hex");
+    const buffer = Buffer.from(bencodedStr, "binary");
+    const infoHash = createHash("sha1").update(buffer).digest("hex");
     return infoHash;
 }
 
