@@ -63,7 +63,6 @@ function decodeBencodeDictionary(bencodedValue: string): [Record<string, any>, n
 
 function generateInfoHash(infoMap: Record<string, any>): string {
     const bencodedStr = bencode(infoMap);
-    console.log(bencodedStr);
     const buffer = Buffer.from(bencodedStr, "binary");
     const infoHash = createHash("sha1").update(buffer).digest("hex");
     return infoHash;
@@ -90,6 +89,16 @@ if (args[2] === "decode") {
         if(!("announce" in torrent) || !("info" in torrent)){
             throw new Error("Invalid Torrent File");
         }
-        console.log(`Tracker URL: ${torrent["announce"]}\nLength: ${torrent["info"]["length"]}\nInfo Hash: ${generateInfoHash(torrent["info"])}`);
+        const pieceHashes = torrent["info"]["pieces"];
+        let formattedPieceHashes = "";
+        for (let i = 0; i < pieceHashes.length; i += 40) {
+            formattedPieceHashes += pieceHashes.slice(i, i + 40) + "\n";
+        }
+        console.log(`   Tracker URL: ${torrent["announce"]}\n
+                        Length: ${torrent["info"]["length"]}\n
+                        Info Hash: ${generateInfoHash(torrent["info"])}\n
+                        Piece Length: ${torrent["info"]["piece length"]}\n
+                        Piece Hashes: \n${formattedPieceHashes}\n
+                    `);
     }
 }
