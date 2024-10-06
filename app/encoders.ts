@@ -1,3 +1,12 @@
+export function isRecord(input: any): input is Record<string, any> {
+    return (
+        input !== null &&
+        typeof input === 'object' &&
+        !Array.isArray(input) &&
+        Object.keys(input).every(key => typeof key === 'string')
+    );
+}
+
 export function bencode(input: any): string {
     if(typeof input === 'string') {
         return encodeStr(input);
@@ -5,19 +14,20 @@ export function bencode(input: any): string {
         return encodeInt(input);
     } else if(input instanceof Array) {
         return encodeList(input);
-    } else if(input instanceof Map) {
+    } else if(isRecord(input)) {
         return encodeDict(input);
     } else {
         throw new Error("Only strings, numbers, lists and dictionaries can be bencoded!");
     }
 }
 
-function encodeDict(map: Map<any, any>): string {
+function encodeDict(map: Record<string, any>): string {
     let bencodedStr = "d";
-    map.forEach((key, value) => {
-        bencodedStr += bencode(key);
+    for (const [key, value] of Object.entries(map)) {
+        bencodedStr += encodeStr(key);
         bencodedStr += bencode(value);
-    })
+    }
+    bencodedStr += "e";
     return bencodedStr;
 }
 

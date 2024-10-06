@@ -1,18 +1,18 @@
-import fs from "fs";
-import { bencode } from "./encoders";
+import { readFileSync } from "fs";
+import { bencode, isRecord } from "./encoders";
 import { createHash } from "crypto";
 
-function decodeBencode(bencodedValue: string): [string | number | Array<any> | Map<any, any>, number] {
+function decodeBencode(bencodedValue: string): [string | number | Array<any> | Record<string, any>, number] {
     if (!isNaN(parseInt(bencodedValue[0]))) {
         return decodeBencodeString(bencodedValue);
-    } else if (bencodedValue[0] == 'i' && bencodedValue[bencodedValue.length-1] == 'e') {
+    } else if (bencodedValue[0] == 'i') {
         return decodeBencodeNumber(bencodedValue);
-    } else if (bencodedValue[0] == 'l' && bencodedValue[bencodedValue.length-1] == 'e') {
+    } else if (bencodedValue[0] == 'l') {
         return decodeBencodeList(bencodedValue);
-    } else if (bencodedValue[0] == 'd' && bencodedValue[bencodedValue.length-1] == 'e') {
+    } else if (bencodedValue[0] == 'd') {
         return decodeBencodeDictionary(bencodedValue);
     } else {
-        throw new Error("Only strings and numbers are supported at this moment.");
+        throw new Error("Only strings, numbers, lists and dictionaries are supported!");
     }
 }
 
@@ -23,40 +23,45 @@ function decodeBencodeString(bencodedValue: string): [string, number] {
     }
     const lenStr = bencodedValue.substring(0, firstColonIndex);
     const len = parseInt(lenStr);
-    return [bencodedValue.substring(firstColonIndex + 1, firstColonIndex + 1 + len), len];
+    return [bencodedValue.substring(firstColonIndex + 1, firstColonIndex + 1 + len), firstColonIndex + 1 + len];
 }
 
 function decodeBencodeNumber(bencodedValue: string): [number, number] {
     const firstEIndex = bencodedValue.indexOf("e");
     const numberStr = bencodedValue.substring(1, firstEIndex);
     const ans = parseInt(numberStr);
-    return [ans, firstEIndex-1];
+    return [ans, firstEIndex+1];
 }
 
 function decodeBencodeList(bencodedValue: string): [Array<any>, number] {
     const ans = new Array<any>;
     let index = 1;
     while(bencodedValue[index] != 'e'){
-        bencodedValue = bencodedValue.substring(index);
-        const [parsedStr, len] = decodeBencode(bencodedValue);
+        const [parsedStr, len] = decodeBencode(bencodedValue.substring(index));
+        ans.push(parsedStr);
         index += len;
     }
     return [ans, index+1];
 }
 
-function decodeBencodeDictionary(bencodedValue: string): [Map<any, any>, number] {
-    let dictionary = new Map<any, any>;
+function decodeBencodeDictionary(bencodedValue: string): [Record<string, any>, number] {
+    let dictionary: Record<string, any> = {};
     let index = 1;
     while(bencodedValue[index] != 'e'){
         const [key, keyLength] = decodeBencode(bencodedValue.substring(index));
         index += keyLength;
         const [value, valueLength] = decodeBencode(bencodedValue.substring(index));
         index += valueLength;
+        if(typeof key === 'string'){
+            dictionary[key] = value;
+        } else {
+            throw new Error("Dictionary keys can only be strings!");
+        }
     }
     return [dictionary, index+1];
 }
 
-function generateInfoHash(infoMap: Map<any, any>): string {
+function generateInfoHash(infoMap: Record<string, any>): string {
     const bencodedStr = bencode(infoMap);
     const infoHash = createHash("sha1").update(bencodedStr).digest("hex");
     return infoHash;
@@ -76,13 +81,13 @@ if (args[2] === "decode") {
     }
 } else if (args[2] === "info") {
     const torrentFile = args[3];
-    const contents = fs.readFileSync(torrentFile, "utf-8");
+    const contents = readFileSync(torrentFile).toString("binary");
     const [decoded, decodedLength] = decodeBencode(contents);
-    if(decoded instanceof Map){
+    if(isRecord(decoded)){
         const torrent = decoded;
-        if(!torrent.has("announce") || !torrent.has("info")){
+        if(!("announce" in torrent) || !("info" in torrent)){
             throw new Error("Invalid Torrent File");
         }
-        console.log(`Tracker URL: ${torrent.get("announce")}\nLength: ${torrent.get("info").get("length")}\nInfo Hash: ${generateInfoHash(torrent.get("info"))}`);
+        console.log(`Tracker URL: ${torrent["announce"]}\nLength: ${torrent["info"]["length"]}\nInfo Hash: ${generateInfoHash(torrent["info"])}`);
     }
 }
