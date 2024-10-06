@@ -1,4 +1,6 @@
 import fs from "fs";
+import { bencode } from "./encoders";
+import { createHash } from "crypto";
 
 function decodeBencode(bencodedValue: string): [string | number | Array<any> | Map<any, any>, number] {
     if (!isNaN(parseInt(bencodedValue[0]))) {
@@ -54,6 +56,12 @@ function decodeBencodeDictionary(bencodedValue: string): [Map<any, any>, number]
     return [dictionary, index+1];
 }
 
+function generateInfoHash(infoMap: Map<any, any>): string {
+    const bencodedStr = bencode(infoMap);
+    const infoHash = createHash("sha1").update(bencodedStr).digest("hex");
+    return infoHash;
+}
+
 const args = process.argv;
 
 if (args[2] === "decode") {
@@ -75,6 +83,6 @@ if (args[2] === "decode") {
         if(!torrent.has("announce") || !torrent.has("info")){
             throw new Error("Invalid Torrent File");
         }
-        console.log(`Tracker URL: ${torrent.get("announce")}\nLength: ${torrent.get("info").get("length")}`);
+        console.log(`Tracker URL: ${torrent.get("announce")}\nLength: ${torrent.get("info").get("length")}\nInfo Hash: ${generateInfoHash(torrent.get("info"))}`);
     }
 }
